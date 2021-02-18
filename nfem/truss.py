@@ -97,9 +97,9 @@ class Truss:
 
         if linear:
             # FIXME this is not a clean solution to solve the LPB issue
-            epsilon = self.calculate_linear_strain()
+            epsilon = self.engineering_strain
         else:
-            epsilon = self.calculate_green_lagrange_strain()
+            epsilon = self.green_lagrange_strain
 
         sigma = E * epsilon + prestress
 
@@ -120,7 +120,10 @@ class Truss:
 
         return K_m + K_g
 
-    def calculate_green_lagrange_strain(self):
+    @property
+    def green_lagrange_strain(self) -> float:
+        """Get the Green-Lagrange strain of the truss element"""
+
         # reference base vector
         A1 = self.node_b.ref_location - self.node_a.ref_location
 
@@ -132,8 +135,9 @@ class Truss:
 
         return epsilon_GL
 
-    def calculate_linear_strain(self):
-        """FIXME"""
+    @property
+    def engineering_strain(self) -> float:
+        """Get the engineering strain of the truss element"""
 
         # reference base vector
         A1 = self.node_b.ref_location - self.node_a.ref_location
@@ -150,6 +154,57 @@ class Truss:
 
         return e_lin
 
+    @property
+    def euler_almansi_strain(self) -> float:
+        """Get the Euler-Almansi strain of the truss element"""
+
+        # reference base vector
+        A1 = self.node_b.ref_location - self.node_a.ref_location
+
+        # actual base vector
+        a1 = self.node_b.location - self.node_a.location
+
+        # green-lagrange strain
+        epsilon_GL = (a1 @ a1 - A1 @ A1) / (2 * a1 @ a1)
+
+        return epsilon_GL
+
+    @property
+    def biot_stress(self) -> float:
+        """Get the biot stress of the truss element"""
+
+        sigma_pk2 = self.pk2_stress
+        # stress:
+        sigma = (self.length/self.ref_length) * sigma_pk2
+
+        return sigma
+
+    @property
+    def pk2_stress(self) -> float:
+        """Get the 2nd Piola-Kirchhoff stress of the truss element"""
+
+        eps = self.green_lagrange_strain
+        E = self.youngs_modulus
+
+        # stress:
+        sigma = eps * E + self.prestress
+
+        return sigma
+
+    @property
+    def cauchy_stress(self) -> float:
+        """Get the biot stress of the truss element"""
+
+        eps = self.euler_almansi_strain
+        sigma_b = self.biot_stress
+        # is this the correct formula?
+        true_area = self.area/(eps+1)
+
+        # stress:
+        sigma = (self.area/true_area) * sigma_b
+
+        return sigma
+
     def calculate_internal_forces(self):
         # reference base vector
         A1 = self.node_b.ref_location - self.node_a.ref_location
@@ -158,7 +213,7 @@ class Truss:
         a1 = self.node_b.location - self.node_a.location
 
         # green-lagrange strain
-        eps = self.calculate_green_lagrange_strain()
+        eps = self.green_lagrange_strain
 
         E = self.youngs_modulus
         A = self.area
@@ -176,38 +231,29 @@ class Truss:
 
         return F
 
-    def calculate_stress(self):
-        eps = self.calculate_green_lagrange_strain()
-        E = self.youngs_modulus
-
-        # stress:
-        sigma = eps * E + self.prestress
-
-        return sigma
-
     @property
     def normal_force(self) -> float:
-        biot_stress = self.calculate_stress() * self.length / self.ref_length
+        biot_stress = self.biot_stress
         A = self.area
         F = biot_stress * A
 
         return F
 
     def draw(self, item):
-        sigma = self.calculate_stress()
+        sigma_pk2 = self.pk2_stress
         color = 'black'
         eta = None
 
-        if self.calculate_stress() > 1e-3:
+        if sigma_pk2 > 1e-3:
             color = 'blue'
             if self.tensile_strength is not None:
                 sigma_max = self.tensile_strength
-                eta = sigma / sigma_max
-        elif self.calculate_stress() < -1e-3:
+                eta = sigma_pk2 / sigma_max
+        elif sigma_pk2 < -1e-3:
             color = 'red'
             if self.compressive_strength is not None:
                 sigma_max = -self.compressive_strength
-                eta = sigma / sigma_max
+                eta = sigma_pk2 / sigma_max
         elif self.tensile_strength is not None and self.compressive_strength is not None:
             eta = 0.0
 
@@ -236,9 +282,12 @@ class Truss:
 
         item.add_result('Length undeformed', self.ref_length)
         item.add_result('Length', self.length)
-        item.add_result('Engineering Strain', self.calculate_linear_strain())
-        item.add_result('Green-Lagrange Strain', self.calculate_green_lagrange_strain())
-        item.add_result('PK2 Stress', sigma)
+        item.add_result('Engineering Strain', self.engineering_strain)
+        item.add_result('Green-Lagrange Strain', self.green_lagrange_strain)
+        item.add_result('Euler-Almansi Strain', self.euler_almansi_strain)
+        item.add_result('Biot Stress', self.biot_stress)
+        item.add_result('PK2 Stress', self.pk2_stress)
+        item.add_result('Cauchy Stress', self.cauchy_stress)
         item.add_result('Normal Force', self.normal_force)
 
         if eta is not None:

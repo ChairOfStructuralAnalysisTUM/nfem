@@ -41,19 +41,19 @@ def test_truss_act_length(truss):
 
 
 def test_truss_linear_strain_is_zero(undeformed_truss):
-    assert_equal(undeformed_truss.calculate_linear_strain(), 0)
+    assert_equal(undeformed_truss.engineering_strain, 0)
 
 
 def test_truss_green_lagrange_strain_is_zero(undeformed_truss):
-    assert_equal(undeformed_truss.calculate_green_lagrange_strain(), 0)
+    assert_equal(undeformed_truss.green_lagrange_strain, 0)
 
 
 def test_truss_engineering_strain(truss_xls):
-    assert_equal(truss_xls.calculate_linear_strain(), 0.0071428571428572)
+    assert_equal(truss_xls.engineering_strain, 0.0071428571428572)
 
 
 def test_truss_green_lagrange_strain(truss_xls):
-    assert_equal(truss_xls.calculate_green_lagrange_strain(), 0.00750000000000003)
+    assert_equal(truss_xls.green_lagrange_strain, 0.00750000000000003)
 
 
 def test_truss_normal_force(truss_xls):
